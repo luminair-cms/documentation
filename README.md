@@ -1,12 +1,16 @@
-# Luminair CMS - Cross-Repository Documentation
+# Luminair CMS - Core Documentation
 
-This repository contains the central, cross-repository documentation for the Luminair CMS platform, including the backend service (`luminair-service`) and the frontend React application.
+Luminair is a Schema-Driven CMS platform inspired by Strapi, built for Speed and Reliability. 
 
-## Documentation Index
+## Key Differences from Strapi
 
-* **[Architecture](architecture.md)**: High-level overview of the domain-driven design, hexagonal architecture, and modular service/migration structure.
-* **[Domain Model](domain-model.md)**: Specifications for schema registries, document attributes, content value models, and the runtime state model.
-* **[REST API](api.md)**: API endpoint references, request payload schemas, sorting & filtering conventions, and relation management rules.
-* **[Database Design](database.md)**: Details on PostgreSQL schema generation, table-naming, draft and snapshot tables, and migration execution modes.
-* **[Draft & Publish Workflow](draft-publish.md)**: Dynamic state transitions between draft, published, and modified states.
-* **[Schema Formats](schemas.md)**: JSON structure definitions for defining collections and single-types.
+* **Field-Level Internationalization (i18n)**: Unlike Strapi (which duplicates the entire document per locale), Luminair configures localization at the individual attribute/field level. Single documents store multi-lingual text dynamically (stored as `jsonb` objects in the database).
+* **Hexagonal & Domain-Driven Design**: The system is split into distinct domain and infrastructure layers to maximize testability and maintainability.
+* **Stable UUID Identifiers**: Documents are identified by stable UUIDs (`document_id`) across drafts, modifications, and publications.
+
+## Shared Documentation Index
+
+These documents serve as the shared specifications for both the frontend React administration panel and the backend Rust service:
+
+* **[REST API](api.md)**: REST API endpoint references, request payload schemas, sorting & filtering conventions, and relation management rules.
+* **[Draft & Publish Workflow](draft-publish.md)**: Lifecycle states and transitions (draft, published, modified).
