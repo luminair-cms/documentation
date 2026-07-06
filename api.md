@@ -37,6 +37,9 @@ There are 2 types of routes:
 
 ### Singleton example
 
+> [!WARNING]
+> Singletons are postponed to the post-MVP phase. The endpoints below are not implemented yet in this version of the service.
+
 | Method | URL | Description |
 | ------ | --- | ----------- |
 | GET | `/api/documents/homepage` | Get the homepage content |
@@ -296,6 +299,9 @@ If you are returning populated relations, use `populate` to load those related f
 Populate relational fields and nested objects using `populate`.
 The `populate` parameter controls which relations and nested content are returned with the response.
 
+> [!WARNING]
+> Nested population (deep populate, e.g. `populate[author][populate]=something`) is not supported in the MVP backend. Only single-level population of direct relations (e.g. `populate=author` or `populate=*`) is supported.
+
 Examples:
 
 ```http
@@ -513,6 +519,9 @@ Content-Type: application/json
 ### Set
 
 The `set` operation replaces all existing relations with a new set. It performs a full update, meaning all previous relations are removed and replaced with the specified ones.
+
+> [!WARNING]
+> The `set` relation operation is not implemented yet in the MVP backend. Attempting to use this operation will return a `422 Unprocessable Entity` error.
 
 **Syntax:** Both shorthand and longhand syntax are supported:
 
