@@ -14,4 +14,5 @@ These documents serve as the shared specifications for both the frontend React a
 
 * **[REST API](api.md)**: REST API endpoint references, request payload schemas, sorting & filtering conventions, and relation management rules.
 * **[Draft & Publish Workflow](draft-publish.md)**: Lifecycle states and transitions (draft, published, modified).
+* **[Authentication & Authorization](auth-design.md)**: SSO, JWKS token verification, user/service clients, and role-based access controls.
 * **[Backend Service Codebase](https://github.com/luminair-cms/luminair-service/blob/main/readme.MD)**: Implementation details, configuration setup, database migration commands, and backend-specific tests.
