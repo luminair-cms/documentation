@@ -14,10 +14,255 @@ There are 2 types of routes:
 
 ### Meta routes
 
-| Method | URL                     | Description |
-| ------ |-------------------------| ----------- |
-| GET | /api/meta/documents     | list all documents |
-| GET | /api/meta/documents/:id | Get full metainfo about document by ID |
+| Method | URL                          | Description                            |
+| ------ | ---------------------------- | -------------------------------------- |
+| GET    | `/api/meta/documents`        | List all registered document types     |
+| GET    | `/api/meta/documents/:id`    | Get full schema for a document type    |
+
+---
+
+## Meta API Reference
+
+The meta endpoints expose the **schema registry** — the set of content-type definitions that drive
+every other part of the API. They are read-only and require no authentication in the current version.
+
+---
+
+### `GET /api/meta/documents`
+
+Returns a summary list of every registered document type.
+
+**Request:** no parameters.
+
+**Response `200 OK`:**
+
+```json
+[
+  {
+    "id": "partners",
+    "title": "Partners",
+    "type": "collection",
+    "description": "Partners with unique IDNO and Legal Entity"
+  },
+  {
+    "id": "brands",
+    "title": "Brands",
+    "type": "collection",
+    "description": "Brands of partners"
+  }
+]
+```
+
+> [!NOTE]
+> The response is a plain JSON **array**, not wrapped in the standard `{ data, meta }` envelope
+> that document CRUD endpoints use. This is intentional — meta endpoints carry no pagination.
+
+#### `DocumentResponse` fields
+
+| Field         | Type                        | Description                                    |
+| ------------- | --------------------------- | ---------------------------------------------- |
+| `id`          | String                      | The plural API identifier (used in all routes) |
+| `title`       | String                      | Human-readable display name                    |
+| `type`        | `"collection"` \| `"singleType"` | Document kind                             |
+| `description` | String \| `null`            | Optional human-readable description            |
+
+---
+
+### `GET /api/meta/documents/:id`
+
+Returns the full schema definition for a single document type, including all field and relation
+attributes with their types, constraints, and options.
+
+**Path parameter:** `:id` — the document type's plural API ID (e.g. `points-of-sale`).
+
+**Response `200 OK`:**
+
+```json
+{
+  "id": "points-of-sale",
+  "title": "Points of sale",
+  "type": "collection",
+  "info": {
+    "title": "Points of sale",
+    "description": "Point of sale (concrete address)",
+    "singularName": "point-of-sale",
+    "pluralName": "points-of-sale"
+  },
+  "options": {
+    "draftAndPublish": true,
+    "localizations": ["en", "ro", "ru"]
+  },
+  "attributes": [
+    {
+      "id": "title",
+      "type": "text",
+      "unique": false,
+      "required": false,
+      "constraints": []
+    },
+    {
+      "id": "latitude",
+      "type": { "decimal": { "precision": 10, "scale": 8 } },
+      "unique": false,
+      "required": true,
+      "constraints": []
+    },
+    {
+      "id": "partner",
+      "relation": "belongsToOne",
+      "target": "partners"
+    }
+  ]
+}
+```
+
+**Error responses:**
+
+| Status | When |
+| ------ | ---- |
+| `404 Not Found` | No document type with the given `:id` is registered |
+| `422 Unprocessable Entity` | The `:id` value fails internal ID validation (e.g. empty string) |
+
+---
+
+#### `DetailedDocumentResponse` fields
+
+| Field        | Type                              | Description                          |
+| ------------ | --------------------------------- | ------------------------------------ |
+| `id`         | String                            | Plural API ID                        |
+| `title`      | String                            | Display name                         |
+| `type`       | `"collection"` \| `"singleType"` | Document kind                        |
+| `info`       | `DocumentInfo`                    | Full naming metadata                 |
+| `options`    | `DocumentOptions` \| `null`       | Feature flags; `null` when absent    |
+| `attributes` | `Attribute[]`                     | Ordered list of fields and relations |
+
+#### `DocumentInfo`
+
+| Field          | Type             | Description                         |
+| -------------- | ---------------- | ----------------------------------- |
+| `title`        | String           | Display name (same as root `title`) |
+| `description`  | String \| `null` | Optional description                |
+| `singularName` | String           | Singular API ID (used for singletons) |
+| `pluralName`   | String           | Plural API ID (used for collections) |
+
+#### `DocumentOptions`
+
+| Field            | Type     | Description                                                  |
+| ---------------- | -------- | ------------------------------------------------------------ |
+| `draftAndPublish`| Boolean  | Whether draft/publish workflow is enabled for this type      |
+| `localizations`  | String[] | Enabled locale codes (e.g. `["en", "ro", "ru"]`); empty array when i18n is disabled |
+
+---
+
+#### `Attribute` — field vs. relation
+
+Each entry in `attributes` is **one of two shapes**, discriminated by the presence of `type` (field)
+or `relation` (relation). They are serialised as an untagged union — the client must check which
+keys are present.
+
+##### Field attribute shape
+
+```json
+{
+  "id": "idno",
+  "type": "<FieldType>",
+  "unique": true,
+  "required": true,
+  "constraints": [ ... ]
+}
+```
+
+| Field         | Type              | Description                                |
+| ------------- | ----------------- | ------------------------------------------ |
+| `id`          | String            | Attribute identifier (matches column name) |
+| `type`        | `FieldType`       | See the FieldType reference below          |
+| `unique`      | Boolean           | Whether a unique index is enforced         |
+| `required`    | Boolean           | Whether `null` values are rejected         |
+| `constraints` | `FieldConstraint[]` | Validation rules applied at write time   |
+
+##### Relation attribute shape
+
+```json
+{
+  "id": "partner",
+  "relation": "belongsToOne",
+  "target": "partners"
+}
+```
+
+| Field      | Type           | Description                                         |
+| ---------- | -------------- | --------------------------------------------------- |
+| `id`       | String         | Attribute identifier                                |
+| `relation` | `RelationType` | Directionality of the relation (see below)          |
+| `target`   | String         | The plural API ID of the related document type      |
+
+> [!IMPORTANT]
+> Relation attributes do **not** carry `type`, `unique`, `required`, or `constraints` fields.
+> Clients must not assume any of those keys exist when the `relation` key is present.
+
+---
+
+#### `FieldType` reference
+
+The `type` field of a field attribute is a **tagged-union** value. Simple scalar types are
+serialised as a plain string; parameterised types are serialised as a single-key object whose
+value contains the parameters.
+
+| Rust variant                          | JSON wire format                                 | Notes                              |
+| ------------------------------------- | ------------------------------------------------ | ---------------------------------- |
+| `Uid`                                 | `"uid"`                                          | Unique slug based on text          |
+| `Uuid`                                | `"uuid"`                                         | UUID primary key                   |
+| `Text`                                | `"text"`                                         | Plain string                       |
+| `LocalizedText`                       | `"localizedText"`                                | Per-locale map `{ "en": "…" }`     |
+| `Integer(Int16)`                      | `{ "integer": "int16" }`                         | 16-bit signed integer              |
+| `Integer(Int32)` *(default)*          | `{ "integer": "int32" }`                         | 32-bit signed integer              |
+| `Integer(Int64)`                      | `{ "integer": "int64" }`                         | 64-bit signed integer              |
+| `Decimal { precision, scale }`        | `{ "decimal": { "precision": N, "scale": M } }`  | Fixed-point number                 |
+| `Date`                                | `"date"`                                         | Calendar date (`YYYY-MM-DD`)       |
+| `DateTime`                            | `"dateTime"`                                     | ISO-8601 timestamp                 |
+| `Boolean`                             | `"boolean"`                                      | True/false                         |
+| `Json`                                | `"json"`                                         | Arbitrary JSON blob                |
+
+> [!IMPORTANT]
+> Clients **must not** assume `type` is always a plain string. The `Integer` and `Decimal`
+> variants are serialised as single-key objects. A robust client should check `typeof type`:
+> if it is a string, treat it as a simple type name; if it is an object, read the first key as
+> the type name and the value as its parameters.
+
+---
+
+#### `FieldConstraint` reference
+
+Constraints are applied at document write time (create/update). Each constraint is serialised as
+a **single-key object** whose key is the constraint name in camelCase.
+
+| Constraint variant      | JSON wire format                      | Applicable types           |
+| ----------------------- | ------------------------------------- | -------------------------- |
+| `Pattern(String)`       | `{ "pattern": "^[0-9]{13}$" }`        | `text`, `uid`              |
+| `MinimalLength(usize)`  | `{ "minimalLength": 4 }`              | `text`, `uid`, `localizedText` |
+| `MaximalLength(usize)`  | `{ "maximalLength": 10 }`             | `text`, `uid`, `localizedText` |
+| `MinimalIntegerValue(i32)` | `{ "minimalIntegerValue": 0 }`     | `integer`                  |
+| `MaximalIntegerValue(i32)` | `{ "maximalIntegerValue": 100 }`   | `integer`                  |
+
+An empty `constraints` array (`[]`) means no additional validation beyond nullability and
+uniqueness is applied to the field.
+
+---
+
+#### `RelationType` reference
+
+| Value            | Serialised as      | Owning side | Description                                                 |
+| ---------------- | ------------------ | ----------- | ----------------------------------------------------------- |
+| `HasOne`         | `"hasOne"`         | ✅ Yes       | This type owns a FK to exactly one instance of `target`     |
+| `HasMany`        | `"hasMany"`        | ✅ Yes       | This type owns FKs to multiple instances of `target`        |
+| `BelongsToOne`   | `"belongsToOne"`   | ❌ No (inverse) | Inverse of a `hasOne` or `hasMany` on the `target` type |
+| `BelongsToMany`  | `"belongsToMany"`  | ❌ No (inverse) | Inverse of a `hasMany` on the `target` type             |
+
+> [!NOTE]
+> Only owning-side relations (`hasOne`, `hasMany`) can be managed via `connect`/`disconnect`
+> in document write requests. Attempting to mutate an inverse relation returns `422 Unprocessable Entity`.
+
+
 
 ### Documents routes
 
