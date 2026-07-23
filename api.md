@@ -638,9 +638,9 @@ The publish endpoint changes a document's publication state from `Draft` to `Pub
 POST /api/documents/restaurants/791620a6-1099-4a41-ad74-21c5a25ce9b2/publish
 ```
 
-**Success Response (200 OK):**
+**Success Response (204 No Content):**
 
-Returns the published document instance. The response `data` object includes the publication details (`publishedAt`, `publishedBy`, and `revision`) flattened alongside other document properties:
+In accordance with **Command & Query Segregation (CQS)**, command operations (`update`, `publish`, `delete`) return status only (`204 No Content`). To retrieve the updated/published document instance, clients issue a query request (`GET /api/documents/:apiType/:documentId`).
 
 ```json
 {
